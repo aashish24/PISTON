@@ -31,26 +31,28 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 
 namespace piston {
 
-template <typename IndexType, typename ValueType, typename Space>
-struct vtk_plane_field : public piston::image3d<IndexType, ValueType, Space>
+template <typename Space>
+struct vtk_plane_field : public piston::image3d<Space>
 {
-    ValueType origin[3];
-    ValueType spacing[3];
-    ValueType extents[6];
+    typedef unsigned IndexType;
+
+    float origin[3];
+    float spacing[3];
+    float extents[6];
 
     struct grid_coordinates_functor : public thrust::unary_function<
-        IndexType, thrust::tuple<ValueType, ValueType, ValueType> > {
+        IndexType, thrust::tuple<float, float, float> > {
       int xdim;
       int ydim;
       int zdim;
       int PointsPerLayer;
-      ValueType xmin, ymin, zmin;
-      ValueType deltax, deltay, deltaz;
+      float xmin, ymin, zmin;
+      float deltax, deltay, deltaz;
 
       grid_coordinates_functor(
           int dimx, int dimy, int dimz,
-          ValueType minx = 0.0f, ValueType miny = 0.0f, ValueType minz = 0.0f,
-          ValueType dx = 0.0f, ValueType dy = 0.0f, ValueType dz = 0.0f) :
+          float minx = 0.0f, float miny = 0.0f, float minz = 0.0f,
+          float dx = 0.0f, float dy = 0.0f, float dz = 0.0f) :
           xdim(dimx), ydim(dimy), zdim(dimz),
           PointsPerLayer(xdim*ydim),
           xmin(minx), ymin(miny), zmin(minz),
@@ -59,12 +61,12 @@ struct vtk_plane_field : public piston::image3d<IndexType, ValueType, Space>
       }
 
       __host__ __device__
-      thrust::tuple<ValueType, ValueType, ValueType> operator()(
-          IndexType PointId) const
+      thrust::tuple<float, float, float> operator()(
+          const IndexType& PointId) const
       {
-          const ValueType x = xmin + deltax * (PointId % xdim);
-          const ValueType y = ymin + deltay * ((PointId/xdim) % ydim);
-          const ValueType z = zmin + deltaz * (PointId/PointsPerLayer);
+          const float x = xmin + deltax * (PointId % xdim);
+          const float y = ymin + deltay * ((PointId/xdim) % ydim);
+          const float z = zmin + deltaz * (PointId/PointsPerLayer);
 
           return thrust::make_tuple(x,y,z);
       }
@@ -77,31 +79,31 @@ struct vtk_plane_field : public piston::image3d<IndexType, ValueType, Space>
 
     GridCoordinatesTransformIterator grid_coordinates_iterator;
 
-    typedef piston::image3d<IndexType, ValueType, Space> Parent;
+    typedef piston::image3d<Space> Parent;
 
     typedef typename detail::choose_container<typename Parent::CountingIterator,
-        thrust::tuple<ValueType, ValueType, ValueType> >::type
+        thrust::tuple<float, float, float> >::type
           GridCoordinatesContainer;
     GridCoordinatesContainer grid_coordinates_vector;
 
     typedef typename GridCoordinatesContainer::iterator
         GridCoordinatesIterator;
     typedef typename detail::choose_container<typename Parent::CountingIterator,
-      ValueType>::type PointDataContainer;
+      float>::type PointDataContainer;
     PointDataContainer point_data_vector;
 
     typedef typename PointDataContainer::iterator PointDataIterator;
 
-    vtk_plane_field(ValueType origin[3], ValueType normal[3], int dims[3],
-                    ValueType spacing[3], int extents[6]) :
+    vtk_plane_field(float origin[3], float normal[3], int dims[3],
+                    float spacing[3], int extents[6]) :
           Parent(dims[0], dims[1], dims[2]),
           grid_coordinates_iterator(thrust::make_transform_iterator(
               CountingIterator(0),
               grid_coordinates_functor(
                   dims[0], dims[1], dims[2],
-                  origin[0] + ((ValueType)extents[0] * spacing[0]),
-                  origin[1] + ((ValueType)extents[2] * spacing[1]),
-                  origin[2] + ((ValueType)extents[4] * spacing[2]),
+                  origin[0] + ((float)extents[0] * spacing[0]),
+                  origin[1] + ((float)extents[2] * spacing[1]),
+                  origin[2] + ((float)extents[4] * spacing[2]),
                   spacing[0], spacing[1], spacing[2])
               )
           ),
@@ -109,12 +111,12 @@ struct vtk_plane_field : public piston::image3d<IndexType, ValueType, Space>
                                   grid_coordinates_iterator + Parent::NPoints),
           point_data_vector(
               thrust::make_transform_iterator(grid_coordinates_vector.begin(),
-              plane_functor<IndexType, ValueType>(
+              plane_functor<IndexType, float>(
                   make_float3(origin[0], origin[1], origin[2]),
                   make_float3(normal[0], normal[1], normal[2]))),
               thrust::make_transform_iterator(
                   grid_coordinates_vector.end(),
-                  plane_functor<IndexType, ValueType>(
+                  plane_functor<IndexType, float>(
                       make_float3(origin[0], origin[1], origin[2]),
                       make_float3(normal[0], normal[1], normal[2]))))
         {
@@ -134,7 +136,7 @@ struct vtk_plane_field : public piston::image3d<IndexType, ValueType, Space>
             this->extents[5] = extents[5];
         }
 
-    void resize(ValueType origin[3], ValueType normal[3], int xdim, int ydim, int zdim) {
+    void resize(float origin[3], float normal[3], int xdim, int ydim, int zdim) {
         Parent::resize(xdim, ydim, zdim);
 
         grid_coordinates_vector.resize(this->NPoints);
@@ -145,12 +147,12 @@ struct vtk_plane_field : public piston::image3d<IndexType, ValueType, Space>
         point_data_vector.assign(
             thrust::make_transform_iterator(
                 grid_coordinates_vector.begin(),
-                plane_functor<IndexType, ValueType>(
+                plane_functor<IndexType, float>(
                     make_float3(origin[0], origin[1], origin[2]),
                     make_float3(normal[0], normal[1], normal[2]))),
             thrust::make_transform_iterator(
                 grid_coordinates_vector.end(),
-                plane_functor<IndexType, ValueType>(
+                plane_functor<IndexType, float>(
                     make_float3(origin[0], origin[1], origin[2]),
                     make_float3(normal[0], normal[1], normal[2]))));
     }
